@@ -9,12 +9,16 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Also clear on page visibility change (when user returns to tab)
+// But only if we're not in the middle of a login process
 document.addEventListener("visibilitychange", function () {
-  if (!document.hidden) {
+  if (!document.hidden && !isLoggingIn) {
     clearStaffSession();
     setTimeout(checkAuthStatus, 200);
   }
 });
+
+// Flag to track if we're in the middle of logging in
+let isLoggingIn = false;
 
 function switchAuthTab(tab) {
   // Update tab buttons
@@ -101,9 +105,19 @@ function clearAllSessions() {
     credentials: "include",
   })
     .then(() => {
-      location.reload();
+      // Instead of reloading, just reset the UI state
+      currentUser = null;
+      document.getElementById("authContainer").style.display = "block";
+      document.getElementById("userStatus").classList.remove("show");
+      document.getElementById("loanApplicationSection").style.display = "none";
+      hideAuthWarning();
+      // Clear form data
+      document.getElementById("loanApplicationForm").reset();
     })
-    .catch(() => location.reload());
+    .catch(() => {
+      // Only reload as fallback if there's an error
+      location.reload();
+    });
 }
 
 function clearStaffSession() {
@@ -133,6 +147,23 @@ function clearStaffSession() {
 
 function hideAuthWarning() {
   document.getElementById("authStatusBar").classList.remove("show");
+}
+
+function refreshSession() {
+  // Attempt to refresh the session
+  return fetch("/user-auth-status", {
+    credentials: "include"
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.logged_in) {
+      currentUser = { email: data.email };
+      return true;
+    } else {
+      return false;
+    }
+  })
+  .catch(() => false);
 }
 
 function showUserLoggedIn() {
@@ -495,6 +526,7 @@ document
   .addEventListener("submit", async function (e) {
     e.preventDefault();
 
+    isLoggingIn = true; // Set flag to prevent interference
     const email = document.getElementById("loginEmail").value;
     const password = document.getElementById("loginPassword").value;
 
@@ -515,12 +547,17 @@ document
         currentUser = { email: email };
         localStorage.setItem("currentUser", JSON.stringify(currentUser));
         showAlert("Login successful!", "success");
-        setTimeout(showUserLoggedIn, 1000);
+        setTimeout(() => {
+          showUserLoggedIn();
+          isLoggingIn = false; // Clear flag after successful login
+        }, 1000);
       } else {
         showAlert(data.error || "Login failed", "error");
+        isLoggingIn = false; // Clear flag on failed login
       }
     } catch (error) {
       showAlert("Network error. Please try again.", "error");
+      isLoggingIn = false; // Clear flag on error
     }
   });
 
@@ -530,6 +567,7 @@ document
   .addEventListener("submit", async function (e) {
     e.preventDefault();
 
+    isLoggingIn = true; // Set flag to prevent interference
     const fullName = document.getElementById("regFullName").value;
     const email = document.getElementById("regEmail").value;
     const phone = document.getElementById("regPhone").value;
@@ -552,12 +590,17 @@ document
         currentUser = { email: email };
         localStorage.setItem("currentUser", JSON.stringify(currentUser));
         showAlert("Registration successful!", "success");
-        setTimeout(showUserLoggedIn, 1000);
+        setTimeout(() => {
+          showUserLoggedIn();
+          isLoggingIn = false; // Clear flag after successful registration
+        }, 1000);
       } else {
         showAlert(data.error || "Registration failed", "error");
+        isLoggingIn = false; // Clear flag on failed registration
       }
     } catch (error) {
       showAlert("Network error. Please try again.", "error");
+      isLoggingIn = false; // Clear flag on error
     }
   });
 
@@ -570,6 +613,31 @@ document
     const submitBtn = document.getElementById("submitApplicationBtn");
     submitBtn.disabled = true;
     submitBtn.textContent = "🔄 Processing Application with Watson AI...";
+
+    // Validate authentication before submitting
+    try {
+      const authCheck = await fetch("/user-auth-status", {
+        credentials: "include"
+      });
+      const authData = await authCheck.json();
+      
+      if (!authData.logged_in) {
+        showAlert("⚠️ Session expired. Please login again to submit your application.", "error", "application");
+        logout(); // Force logout and show login form
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit Application";
+        return;
+      }
+    } catch (error) {
+      showAlert("⚠️ Unable to verify authentication. Please login again.", "error", "application");
+      logout();
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Application";
+      return;
+    }
+
+    // Get current language
+    const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
 
     const formData = {
       "full-name": document.getElementById("fullName").value,
@@ -589,89 +657,690 @@ document
       "loan-purpose": document.getElementById("loanPurpose").value,
       "preferred-emi": document.getElementById("preferredEmi").value || "",
       "cibil-score": document.getElementById("cibilScore").value,
+      "language": currentLanguage
     };
 
     try {
-      const response = await fetch("/apply-comprehensive-loan", {
+      const response = await fetch("/evaluate-loan-eligibility", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // Include cookies for session management
+        credentials: "include",
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        const applicationId = data.application_id;
-        const eligibilityStatus = data.eligibility_status;
-
-        // Show success message with status
-        let statusMessage = "";
-        let alertType = "success";
-
-        if (eligibilityStatus === "APPROVED") {
-          statusMessage = `🎉 Congratulations! Your application ${applicationId} is PRE-APPROVED! 
-                        
-Next Steps:
-• Check your email for document requirements
-• Upload required documents below
-• Wait for final verification`;
-
-          // Show document upload section for approved applications
-          showDocumentUploadSection(applicationId, data.required_documents);
-        } else if (eligibilityStatus === "CONDITIONALLY_APPROVED") {
-          statusMessage = `⚠️ Your application ${applicationId} is CONDITIONALLY APPROVED! 
-                        
-Assessment: ${data.eligibility_reason}
-
-Required Documents: ${data.required_documents}
-
-Please check your email for detailed instructions.`;
-          alertType = "info";
-
-          // Show document upload section for conditionally approved applications
-          showDocumentUploadSection(applicationId, data.required_documents);
-        } else {
-          statusMessage = `📋 Application ${applicationId} submitted for review.
-                        
-Assessment: ${data.eligibility_reason}
-
-Please check your email for next steps and recommendations.`;
-          alertType = "info";
-        }
-
-        showAlert(statusMessage, alertType, "application");
-
-        // Save application draft for approved/conditionally approved
-        if (
-          eligibilityStatus === "APPROVED" ||
-          eligibilityStatus === "CONDITIONALLY_APPROVED"
-        ) {
-          saveApplicationDraft(
-            applicationId,
-            formData,
-            eligibilityStatus,
-            data.required_documents
-          );
-        }
-
-        // Reset form
-        document.getElementById("loanApplicationForm").reset();
+        // Show AI assessment popup
+        showLoanAssessmentPopup(data, formData);
       } else {
-        showAlert(
-          data.error || "Application submission failed",
-          "error",
-          "application"
-        );
+        // Check if it's an authentication error
+        if (data.error === 'Not authenticated') {
+          showAlert("🔒 Session expired. Please login again to continue.", "error", "application");
+          logout(); // Force logout and show login form
+        } else {
+          showAlert(data.error || "Application processing failed", "error", "application");
+        }
       }
     } catch (error) {
-      showAlert("Network error. Please try again.", "error", "application");
-      console.error("Application error:", error);
+      showAlert("⚠️ Network error. Please check your connection and try again.", "error", "application");
+    } finally {
+      // Reset button
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Application";
     }
-
-    submitBtn.disabled = false;
-    submitBtn.textContent = "🚀 Submit Application for AI Pre-Approval";
   });
+
+// Show Loan Assessment Popup with AI results
+function showLoanAssessmentPopup(assessmentData, formData) {
+  const popup = document.createElement('div');
+  popup.className = 'assessment-popup-overlay';
+  popup.innerHTML = createAssessmentPopupContent(assessmentData, formData);
+  document.body.appendChild(popup);
+  
+  // Add event listeners for popup interactions
+  setupAssessmentPopupEvents(popup, assessmentData, formData);
+}
+
+function createAssessmentPopupContent(data, formData) {
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  if (data.eligible) {
+    // Eligible - Show schemes
+    return `
+      <div class="assessment-popup">
+        <div class="popup-header">
+          <h2>🎉 ${getTranslation('loan-eligible-title', currentLanguage)}</h2>
+          <button class="close-popup" onclick="closeAssessmentPopup()">&times;</button>
+        </div>
+        
+        <div class="popup-content">
+          <div class="ai-assessment">
+            <h3>🤖 ${getTranslation('ai-assessment', currentLanguage)}</h3>
+            <div class="assessment-text">${data.ai_assessment}</div>
+          </div>
+          
+          <div class="recommended-schemes">
+            <h3>📋 ${getTranslation('recommended-schemes', currentLanguage)}</h3>
+            <div class="schemes-grid">
+              ${data.recommended_schemes.map(scheme => createSchemeCard(scheme, currentLanguage)).join('')}
+            </div>
+          </div>
+          
+          <div class="popup-actions">
+            <button class="btn-secondary" onclick="askLoanAgent()">
+              💬 ${getTranslation('ask-loan-agent', currentLanguage)}
+            </button>
+            <button class="btn-secondary" onclick="selectNoneScheme()">
+              ❌ ${getTranslation('none-scheme', currentLanguage)}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Not eligible - Show improvement suggestions
+    return `
+      <div class="assessment-popup">
+        <div class="popup-header">
+          <h2>📋 ${getTranslation('loan-assessment-title', currentLanguage)}</h2>
+          <button class="close-popup" onclick="closeAssessmentPopup()">&times;</button>
+        </div>
+        
+        <div class="popup-content">
+          <div class="ai-assessment">
+            <h3>🤖 ${getTranslation('ai-assessment', currentLanguage)}</h3>
+            <div class="assessment-text">${data.ai_assessment}</div>
+          </div>
+          
+          <div class="improvement-suggestions">
+            <h3>🔧 ${getTranslation('improvement-suggestions', currentLanguage)}</h3>
+            <ul class="suggestions-list">
+              ${data.improvement_suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+            </ul>
+          </div>
+          
+          <div class="popup-actions">
+            <button class="btn-secondary" onclick="askLoanAgent()">
+              💬 ${getTranslation('ask-loan-agent', currentLanguage)}
+            </button>
+            <button class="btn-primary" onclick="closeAssessmentPopup()">
+              ✅ ${getTranslation('understand', currentLanguage)}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function createSchemeCard(schemeData, language) {
+  const scheme = schemeData.scheme_data;
+  return `
+    <div class="scheme-card" data-scheme-id="${schemeData.scheme_id}">
+      <div class="scheme-header">
+        <h4>${scheme.name}</h4>
+        <div class="match-score">Match: ${schemeData.match_score}%</div>
+      </div>
+      <div class="scheme-details">
+        <p><strong>Interest Rate:</strong> ${scheme.interest_rate}</p>
+        <p><strong>Max Tenure:</strong> ${scheme.max_tenure} years</p>
+        <p><strong>Amount:</strong> ₹${scheme.min_amount.toLocaleString()} - ₹${scheme.max_amount.toLocaleString()}</p>
+        <p><strong>Min Income:</strong> ₹${scheme.min_income.toLocaleString()}</p>
+      </div>
+      <div class="scheme-features">
+        <h5>Key Features:</h5>
+        <ul>
+          ${scheme.features.slice(0, 2).map(feature => `<li>${feature}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="scheme-actions">
+        <button class="btn-primary btn-small" onclick="selectScheme('${schemeData.scheme_id}')">
+          Select This Scheme
+        </button>
+        <button class="btn-secondary btn-small" onclick="viewSchemeDetails('${schemeData.scheme_id}')">
+          View Details
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function setupAssessmentPopupEvents(popup, assessmentData, formData) {
+  // Store data for later use
+  window.currentAssessmentData = assessmentData;
+  window.currentFormData = formData;
+  
+  // Close popup when clicking outside
+  popup.addEventListener('click', function(e) {
+    if (e.target === popup) {
+      closeAssessmentPopup();
+    }
+  });
+}
+
+// Popup Action Functions
+function closeAssessmentPopup() {
+  const popup = document.querySelector('.assessment-popup-overlay');
+  if (popup) {
+    popup.remove();
+  }
+}
+
+function selectScheme(schemeId) {
+  const schemeData = window.currentAssessmentData.recommended_schemes.find(s => s.scheme_id === schemeId);
+  if (schemeData) {
+    showSchemeApplicationFlow(schemeData);
+  }
+}
+
+function viewSchemeDetails(schemeId) {
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  // Call backend to get detailed scheme information
+  fetch('/get-scheme-details', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ 
+      scheme_id: schemeId,
+      language: currentLanguage 
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showSchemeDetailsPopup(data.scheme, data.ai_explanation);
+    } else {
+      alert('Error loading scheme details');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Network error loading scheme details');
+  });
+}
+
+function showSchemeDetailsPopup(scheme, aiExplanation) {
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  const popup = document.createElement('div');
+  popup.className = 'scheme-details-popup-overlay';
+  popup.innerHTML = `
+    <div class="scheme-details-popup">
+      <div class="popup-header">
+        <h2>${scheme.name} - Details</h2>
+        <button class="close-popup" onclick="closeSchemeDetailsPopup()">&times;</button>
+      </div>
+      
+      <div class="popup-content">
+        <div class="scheme-info">
+          <div class="info-grid">
+            <div class="info-item">
+              <strong>Type:</strong> ${scheme.type}
+            </div>
+            <div class="info-item">
+              <strong>Interest Rate:</strong> ${scheme.interest_rate}
+            </div>
+            <div class="info-item">
+              <strong>Loan Amount:</strong> ₹${scheme.min_amount.toLocaleString()} - ₹${scheme.max_amount.toLocaleString()}
+            </div>
+            <div class="info-item">
+              <strong>Max Tenure:</strong> ${scheme.max_tenure} years
+            </div>
+            <div class="info-item">
+              <strong>Min Income:</strong> ₹${scheme.min_income.toLocaleString()}
+            </div>
+            <div class="info-item">
+              <strong>Min CIBIL Score:</strong> ${scheme.eligibility.cibil_score}
+            </div>
+          </div>
+          
+          <div class="eligibility-criteria">
+            <h4>Eligibility Criteria:</h4>
+            <ul>
+              <li>Age: ${scheme.eligibility.min_age} - ${scheme.eligibility.max_age} years</li>
+              <li>Employment: ${scheme.eligibility.employment.join(', ')}</li>
+              <li>CIBIL Score: ${scheme.eligibility.cibil_score}+</li>
+            </ul>
+          </div>
+          
+          <div class="required-documents">
+            <h4>Required Documents:</h4>
+            <ul>
+              ${scheme.documents.map(doc => `<li>${doc}</li>`).join('')}
+            </ul>
+          </div>
+          
+          <div class="scheme-features">
+            <h4>Key Features:</h4>
+            <ul>
+              ${scheme.features.map(feature => `<li>${feature}</li>`).join('')}
+            </ul>
+          </div>
+          
+          <div class="ai-explanation">
+            <h4>🤖 AI Expert Analysis:</h4>
+            <div class="explanation-text">${aiExplanation}</div>
+          </div>
+        </div>
+        
+        <div class="popup-actions">
+          <button class="btn-primary" onclick="selectSchemeFromDetails('${scheme.name}')">
+            ✅ Continue with this Scheme
+          </button>
+          <button class="btn-secondary" onclick="closeSchemeDetailsPopup()">
+            🔙 Back to Options
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(popup);
+}
+
+function closeSchemeDetailsPopup() {
+  const popup = document.querySelector('.scheme-details-popup-overlay');
+  if (popup) {
+    popup.remove();
+  }
+}
+
+function selectSchemeFromDetails(schemeName) {
+  closeSchemeDetailsPopup();
+  // Find the scheme by name and proceed
+  const schemeData = window.currentAssessmentData.recommended_schemes.find(s => s.scheme_data.name === schemeName);
+  if (schemeData) {
+    showSchemeApplicationFlow(schemeData);
+  }
+}
+
+function showSchemeApplicationFlow(schemeData) {
+  closeAssessmentPopup();
+  
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  // Submit the application with selected scheme
+  fetch('/submit-scheme-application', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      scheme_id: schemeData.scheme_id,
+      application_data: window.currentFormData
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Show document upload section
+      showSchemeDocumentUpload(data.application_id, data.scheme, data.required_documents);
+    } else {
+      showAlert(data.error || 'Error submitting scheme application', 'error', 'application');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    showAlert('Network error submitting application', 'error', 'application');
+  });
+}
+
+function showSchemeDocumentUpload(applicationId, scheme, requiredDocuments) {
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  const popup = document.createElement('div');
+  popup.className = 'document-upload-popup-overlay';
+  popup.innerHTML = `
+    <div class="document-upload-popup">
+      <div class="popup-header">
+        <h2>📄 Document Upload - ${scheme.name}</h2>
+        <div class="application-id">Application ID: ${applicationId}</div>
+      </div>
+      
+      <div class="popup-content">
+        <div class="success-message">
+          <h3>🎉 Application Submitted Successfully!</h3>
+          <p>Your application for <strong>${scheme.name}</strong> has been submitted.</p>
+          <p>Please upload the required documents to complete your application.</p>
+        </div>
+        
+        <div class="document-requirements">
+          <h4>Required Documents:</h4>
+          <div class="documents-grid">
+            ${requiredDocuments.map(doc => `
+              <div class="document-item">
+                <div class="document-name">${doc}</div>
+                <div class="upload-section">
+                  <input type="file" id="file-${doc.replace(/\s+/g, '-')}" accept=".pdf,.jpg,.jpeg,.png" />
+                  <button class="btn-upload" onclick="uploadDocument('${applicationId}', '${doc}')">
+                    📤 Upload
+                  </button>
+                </div>
+                <div class="upload-status" id="status-${doc.replace(/\s+/g, '-')}"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div class="popup-actions">
+          <button class="btn-primary" onclick="completeDocumentUpload('${applicationId}')">
+            ✅ Complete Application
+          </button>
+          <button class="btn-secondary" onclick="closeDocumentUploadPopup()">
+            📋 Upload Later
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(popup);
+}
+
+function uploadDocument(applicationId, documentType) {
+  const fileId = `file-${documentType.replace(/\s+/g, '-')}`;
+  const statusId = `status-${documentType.replace(/\s+/g, '-')}`;
+  const fileInput = document.getElementById(fileId);
+  const statusDiv = document.getElementById(statusId);
+  
+  if (!fileInput.files[0]) {
+    statusDiv.innerHTML = '<span class="error">Please select a file</span>';
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append('application_id', applicationId);
+  formData.append('document_type', documentType);
+  formData.append('document', fileInput.files[0]);
+  
+  statusDiv.innerHTML = '<span class="uploading">📤 Uploading...</span>';
+  
+  fetch('/upload-documents', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      statusDiv.innerHTML = '<span class="success">✅ Uploaded</span>';
+    } else {
+      statusDiv.innerHTML = `<span class="error">❌ ${data.error}</span>`;
+    }
+  })
+  .catch(error => {
+    console.error('Upload error:', error);
+    statusDiv.innerHTML = '<span class="error">❌ Upload failed</span>';
+  });
+}
+
+function completeDocumentUpload(applicationId) {
+  closeDocumentUploadPopup();
+  showAlert(`Application ${applicationId} completed! Our team will review your documents and contact you soon.`, 'success', 'application');
+  
+  // Reset form
+  document.getElementById("loanApplicationForm").reset();
+}
+
+function closeDocumentUploadPopup() {
+  const popup = document.querySelector('.document-upload-popup-overlay');
+  if (popup) {
+    popup.remove();
+  }
+}
+
+function askLoanAgent() {
+  // Don't close assessment popup, transform it into chat interface
+  const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+  
+  // Get the existing popup
+  const popup = document.querySelector('.assessment-popup-overlay');
+  if (!popup) return;
+  
+  // Replace popup content with chat interface
+  const assessmentPopup = popup.querySelector('.assessment-popup');
+  assessmentPopup.innerHTML = `
+    <div class="popup-header">
+      <h2>💬 ${getTranslation('chat-with-agent', currentLanguage)}</h2>
+      <button class="close-popup" onclick="closeAssessmentPopup()">&times;</button>
+    </div>
+    
+    <div class="popup-content">
+      <div class="chat-container-popup">
+        <div class="chat-messages-popup" id="chatMessagesPopup">
+          <div class="message bot-message">
+            ${getTranslation('agent-welcome', currentLanguage)}
+          </div>
+        </div>
+        
+        <div class="quick-actions-popup">
+          <div class="quick-action-popup" onclick="sendQuickMessagePopup('${getTranslation('quick-loan-types-msg', currentLanguage)}')">${getTranslation('quick-loan-types', currentLanguage)}</div>
+          <div class="quick-action-popup" onclick="sendQuickMessagePopup('${getTranslation('quick-eligibility-msg', currentLanguage)}')">${getTranslation('quick-eligibility', currentLanguage)}</div>
+          <div class="quick-action-popup" onclick="sendQuickMessagePopup('${getTranslation('quick-documents-msg', currentLanguage)}')">${getTranslation('quick-documents', currentLanguage)}</div>
+        </div>
+        
+        <div class="chat-input-popup">
+          <input type="text" id="messageInputPopup" placeholder="${getTranslation('chat-placeholder', currentLanguage)}" onkeypress="handleKeyPressPopup(event)">
+          <button class="send-btn-popup" onclick="sendMessagePopup()" id="sendBtnPopup">${getTranslation('send-btn', currentLanguage)}</button>
+        </div>
+        
+        <div class="typing-indicator-popup" id="typingIndicatorPopup" style="display: none;">
+          <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+        
+        <div class="popup-actions" style="margin-top: 1rem;">
+          <button class="btn-secondary" onclick="goBackToAssessment()">
+            ← ${getTranslation('back-to-assessment', currentLanguage)}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Store original assessment data for going back
+  window.originalAssessmentData = window.currentAssessmentData;
+  window.originalFormData = window.currentFormData;
+}
+
+function selectNoneScheme() {
+  closeAssessmentPopup();
+  showAlert('You can apply again anytime or chat with our LoanAgent for personalized assistance.', 'info', 'application');
+}
+
+// Chat functions for popup
+function handleKeyPressPopup(event) {
+  if (event.key === "Enter") {
+    sendMessagePopup();
+  }
+}
+
+function sendQuickMessagePopup(message) {
+  document.getElementById('messageInputPopup').value = message;
+  sendMessagePopup();
+}
+
+async function sendMessagePopup() {
+  const messageInput = document.getElementById('messageInputPopup');
+  const sendBtn = document.getElementById('sendBtnPopup');
+  const message = messageInput.value.trim();
+  
+  if (!message) return;
+
+  // Add user message
+  addMessagePopup(message, "user");
+  messageInput.value = "";
+
+  // Disable send button and show typing
+  sendBtn.disabled = true;
+  showTypingPopup();
+
+  try {
+    // Get current language from localStorage
+    const currentLanguage = localStorage.getItem('selectedLanguage') || 'en';
+    
+    const response = await fetch("/ask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        query: message,
+        language: currentLanguage
+      }),
+    });
+
+    const data = await response.json();
+
+    // Hide typing and add bot response
+    hideTypingPopup();
+    addMessagePopup(
+      data.response || data.error || "Sorry, I encountered an error.",
+      "bot"
+    );
+  } catch (error) {
+    hideTypingPopup();
+    addMessagePopup(
+      "Sorry, I'm having trouble connecting. Please try again.",
+      "bot"
+    );
+  }
+
+  sendBtn.disabled = false;
+}
+
+function addMessagePopup(message, type) {
+  const chatMessages = document.getElementById("chatMessagesPopup");
+  const messageDiv = document.createElement("div");
+  messageDiv.className = `message ${type}-message`;
+  messageDiv.textContent = message;
+
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTypingPopup() {
+  const typingIndicator = document.getElementById("typingIndicatorPopup");
+  const chatMessages = document.getElementById("chatMessagesPopup");
+  typingIndicator.style.display = "block";
+  chatMessages.appendChild(typingIndicator);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideTypingPopup() {
+  const typingIndicator = document.getElementById("typingIndicatorPopup");
+  typingIndicator.style.display = "none";
+}
+
+function goBackToAssessment() {
+  // Restore original assessment popup
+  if (window.originalAssessmentData && window.originalFormData) {
+    const popup = document.querySelector('.assessment-popup-overlay');
+    if (popup) {
+      const assessmentPopup = popup.querySelector('.assessment-popup');
+      assessmentPopup.innerHTML = createAssessmentPopupContent(window.originalAssessmentData, window.originalFormData);
+      
+      // Re-setup event listeners
+      setupAssessmentPopupEvents(popup, window.originalAssessmentData, window.originalFormData);
+    }
+  }
+}
+
+// Translation helper function
+function getTranslation(key, language) {
+  const translations = {
+    'en': {
+      'loan-eligible-title': 'Congratulations! You are Eligible',
+      'loan-assessment-title': 'Loan Assessment Results',
+      'ai-assessment': 'AI Assessment',
+      'recommended-schemes': 'Recommended Loan Schemes',
+      'improvement-suggestions': 'Improvement Suggestions',
+      'ask-loan-agent': 'Ask LoanAgent',
+      'none-scheme': 'None of These',
+      'understand': 'I Understand',
+      'chat-with-agent': 'Chat with LoanAgent',
+      'agent-welcome': 'Hello! I\'m your AI LoanAgent. I can help you with loan information, eligibility questions, and guidance on improving your application. How can I assist you?',
+      'quick-loan-types': 'Loan Types',
+      'quick-eligibility': 'Eligibility Help',
+      'quick-documents': 'Documents',
+      'quick-loan-types-msg': 'What loan types do you offer?',
+      'quick-eligibility-msg': 'How can I improve my loan eligibility?',
+      'quick-documents-msg': 'What documents do I need for loan application?',
+      'chat-placeholder': 'Ask me about loans, eligibility, documents...',
+      'send-btn': 'Send',
+      'back-to-assessment': 'Back to Assessment'
+    },
+    'hi': {
+      'loan-eligible-title': 'बधाई हो! आप पात्र हैं',
+      'loan-assessment-title': 'लोन मूल्यांकन परिणाम',
+      'ai-assessment': 'AI मूल्यांकन',
+      'recommended-schemes': 'सुझाई गई लोन योजनाएं',
+      'improvement-suggestions': 'सुधार सुझाव',
+      'ask-loan-agent': 'लोनएजेंट से पूछें',
+      'none-scheme': 'इनमें से कोई नहीं',
+      'understand': 'मैं समझता हूं',
+      'chat-with-agent': 'लोनएजेंट से चैट करें',
+      'agent-welcome': 'नमस्ते! मैं आपका AI लोनएजेंट हूं। मैं लोन की जानकारी, पात्रता के प्रश्न, और आपके आवेदन को बेहतर बनाने के लिए मार्गदर्शन में आपकी सहायता कर सकता हूं। मैं आपकी कैसे सहायता कर सकता हूं?',
+      'quick-loan-types': 'लोन प्रकार',
+      'quick-eligibility': 'पात्रता सहायता',
+      'quick-documents': 'दस्तावेज',
+      'quick-loan-types-msg': 'आप कौन से लोन प्रकार ऑफर करते हैं?',
+      'quick-eligibility-msg': 'मैं अपनी लोन पात्रता कैसे सुधार सकता हूं?',
+      'quick-documents-msg': 'लोन आवेदन के लिए मुझे कौन से दस्तावेजों की आवश्यकता है?',
+      'chat-placeholder': 'लोन, पात्रता, दस्तावेजों के बारे में पूछें...',
+      'send-btn': 'भेजें',
+      'back-to-assessment': 'मूल्यांकन पर वापस'
+    },
+    'ta': {
+      'loan-eligible-title': 'வாழ்த்துக்கள்! நீங்கள் தகுதியானவர்',
+      'loan-assessment-title': 'கடன் மதிப்பீட்டு முடிவுகள்',
+      'ai-assessment': 'AI மதிப்பீடு',
+      'recommended-schemes': 'பரிந்துரைக்கப்பட்ட கடன் திட்டங்கள்',
+      'improvement-suggestions': 'மேம்பாட்டு பரிந்துரைகள்',
+      'ask-loan-agent': 'லோன்ஏஜென்ட்டிடம் கேளுங்கள்',
+      'none-scheme': 'இவற்றில் எதுவுமில்லை',
+      'understand': 'நான் புரிந்துகொள்கிறேன்',
+      'chat-with-agent': 'லோன்ஏஜென்ட்டுடன் அரட்டை',
+      'agent-welcome': 'வணக்கம்! நான் உங்கள் AI லோன்ஏஜென்ட். கடன் தகவல், தகுதி கேள்விகள், மற்றும் உங்கள் விண்ணப்பத்தை மேம்படுத்த வழிகாட்டுதலில் உதவ முடியும். நான் உங்களுக்கு எப்படி உதவ முடியும்?',
+      'quick-loan-types': 'கடன் வகைகள்',
+      'quick-eligibility': 'தகுதி உதவி',
+      'quick-documents': 'ஆவணங்கள்',
+      'quick-loan-types-msg': 'நீங்கள் என்ன கடன் வகைகளை வழங்குகிறீர்கள்?',
+      'quick-eligibility-msg': 'என் கடன் தகுதியை எப்படி மேம்படுத்துவது?',
+      'quick-documents-msg': 'கடன் விண்ணப்பத்திற்கு எனக்கு என்ன ஆவணங்கள் தேவை?',
+      'chat-placeholder': 'கடன், தகுதி, ஆவணங்களைப் பற்றி கேளுங்கள்...',
+      'send-btn': 'அனுப்பு',
+      'back-to-assessment': 'மதிப்பீட்டுக்கு திரும்பு'
+    },
+    'te': {
+      'loan-eligible-title': 'అభినందనలు! మీరు అర్హులు',
+      'loan-assessment-title': 'రుణ మూల్యాంకన ఫలితాలు',
+      'ai-assessment': 'AI మూల్యాంకనం',
+      'recommended-schemes': 'సిఫార్సు చేయబడిన రుణ పథకాలు',
+      'improvement-suggestions': 'మెరుగుదల సూచనలు',
+      'ask-loan-agent': 'లోన్ఏజెంట్‌ను అడగండి',
+      'none-scheme': 'వీటిలో ఏదీ లేదు',
+      'understand': 'నేను అర్థం చేసుకున్నాను',
+      'chat-with-agent': 'లోన్ఏజెంట్‌తో చాట్',
+      'agent-welcome': 'నమస్కారం! నేను మీ AI లోన్ఏజెంట్. రుణ సమాచారం, అర్హత ప్రశ్నలు, మరియు మీ దరఖాస్తును మెరుగుపరచడానికి మార్గదర్శనంలో సహాయం చేయగలను. నేను మీకు ఎలా సహాయం చేయగలను?',
+      'quick-loan-types': 'రుణ రకాలు',
+      'quick-eligibility': 'అర్హత సహాయం',
+      'quick-documents': 'పత్రాలు',
+      'quick-loan-types-msg': 'మీరు ఏ రుణ రకాలను అందిస్తారు?',
+      'quick-eligibility-msg': 'నా రుణ అర్హతను ఎలా మెరుగుపరచాలి?',
+      'quick-documents-msg': 'రుణ దరఖాస్తు కోసం నాకు ఏ పత్రాలు అవసరం?',
+      'chat-placeholder': 'రుణాలు, అర్హత, పత్రాల గురించి అడగండి...',
+      'send-btn': 'పంపండి',
+      'back-to-assessment': 'మూల్యాంకనకు తిరిగి'
+    }
+  };
+  
+  return translations[language]?.[key] || translations['en'][key] || key;
+}
 
 // Save application draft to localStorage
 function saveApplicationDraft(applicationId, formData, status, requiredDocs) {

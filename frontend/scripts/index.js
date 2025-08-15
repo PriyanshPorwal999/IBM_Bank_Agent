@@ -27,12 +27,18 @@ async function sendMessage() {
   showTyping();
 
   try {
+    // Get current language from localStorage or global variable
+    const currentLanguage = localStorage.getItem('selectedLanguage') || window.currentLanguage || 'en';
+    
     const response = await fetch("/ask", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query: message }),
+      body: JSON.stringify({ 
+        query: message,
+        language: currentLanguage
+      }),
     });
 
     const data = await response.json();

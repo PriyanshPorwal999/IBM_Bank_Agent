@@ -4,15 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apply for Loan - Banking Portal</title>
-   <link rel="stylesheet" href="./stylesheets/apply.css">
+    <link rel="stylesheet" href="./stylesheets/apply.css">
 </head>
 <body>
     <div class="header">
-        <h1>💼 Loan Application</h1>
-        <p class="subtitle">Apply for Personal, Home, or Business Loans</p>
-        <div class="nav-links">
-            <a href="index.html" class="nav-link">🤖 Loan Agent</a>
-            <a href="staff.html" class="nav-link">👩‍💼 Staff Login</a>
+        <div class="header-content">
+            <div class="header-main">
+                <h1 data-translate="loan-app-title">💼 Loan Application</h1>
+                <p class="subtitle" data-translate="loan-app-subtitle">Apply for Personal, Home, or Business Loans</p>
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link" data-translate="nav-agent">🤖 Loan Agent</a>
+                    <a href="staff.html" class="nav-link" data-translate="nav-staff">👩‍💼 Staff Login</a>
+                </div>
+            </div>
+            
+            <div class="language-selector">
+                <div class="language-dropdown">
+                    <button class="language-btn" id="languageBtn">
+                        <span class="language-flag" id="currentFlag">🇺🇸</span>
+                        <span class="language-text" id="currentLang">English</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="language-menu" id="languageMenu">
+                        <div class="language-option" onclick="changeLanguage('en')">
+                            <span class="flag">🇺🇸</span>
+                            <span>English</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('hi')">
+                            <span class="flag">🇮🇳</span>
+                            <span>हिंदी</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('ta')">
+                            <span class="flag">🇮🇳</span>
+                            <span>தமிழ்</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('te')">
+                            <span class="flag">🇮🇳</span>
+                            <span>తెలుగు</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -24,8 +56,8 @@
         
         <div class="application-container">
             <div class="application-header">
-                <h2>💰 Start Your Loan Application</h2>
-                <p>Get pre-approved in minutes with our AI-powered assessment</p>
+                <h2 data-translate="loan-app-title">💰 Start Your Loan Application</h2>
+                <p data-translate="loan-app-subtitle">Get pre-approved in minutes with our AI-powered assessment</p>
             </div>
             
             <!-- User Authentication Section -->
@@ -102,7 +134,7 @@
                     
                     <!-- New Application Tab Content -->
                     <div id="newApplicationTab" class="tab-content active">
-                        <h3 class="section-title">📋 New Loan Application</h3>
+                        <h3 class="section-title" data-translate="loan-app-title">📋 New Loan Application</h3>
                         
                         <div class="alert alert-info" id="applicationInfo"></div>
                         <div class="alert alert-error" id="applicationError"></div>
@@ -110,26 +142,26 @@
                         
                         <form id="loanApplicationForm">
                             <!-- Personal Details Section -->
-                            <div class="section-title">👤 Personal Details</div>
+                            <div class="section-title" data-translate="personal-info">👤 Personal Details</div>
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label for="fullName">Full Name *</label>
-                                    <input type="text" id="fullName" required placeholder="John Doe">
+                                    <label for="fullName" data-translate="full-name">Full Name *</label>
+                                    <input type="text" id="fullName" required data-translate-placeholder="full-name-placeholder" placeholder="John Doe">
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="dateOfBirth">Date of Birth *</label>
+                                    <label for="dateOfBirth" data-translate="date-of-birth">Date of Birth *</label>
                                     <input type="date" id="dateOfBirth" required>
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="gender">Gender *</label>
+                                    <label for="gender" data-translate="gender">Gender *</label>
                                     <select id="gender" required>
-                                        <option value="">Select Gender</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Prefer not to say">Prefer not to say</option>
-                                        <option value="Attack helicopter">Attack helicopter</option>
+                                        <option value="" data-translate="select-gender">Select Gender</option>
+                                        <option value="Male" data-translate="male">Male</option>
+                                        <option value="Female" data-translate="female">Female</option>
+                                        <option value="Prefer not to say" data-translate="prefer-not-say">Prefer not to say</option>
+
                                     </select>
                                 </div>
                                 
@@ -156,7 +188,7 @@
                             </div>
 
                             <!-- Employment & Income Details Section -->
-                            <div class="section-title">💼 Employment & Income Details</div>
+                            <div class="section-title" data-translate="employment-info">💼 Employment & Income Details</div>
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="employmentType">Employment Type *</label>
@@ -189,7 +221,7 @@
                             </div>
 
                             <!-- Loan Specific Details Section -->
-                            <div class="section-title">🏠 Loan Specific Details</div>
+                            <div class="section-title" data-translate="loan-details">🏠 Loan Specific Details</div>
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="loanType">Type of Loan Needed *</label>
@@ -259,7 +291,7 @@
                     
                     <!-- Drafts Tab Content -->
                     <div id="draftsTab" class="tab-content">
-                        <h3 class="section-title">💾 Application Drafts</h3>
+                        <h3 class="section-title" data-translate="drafts-section">💾 Application Drafts</h3>
                         <div id="draftsContainer">
                             <div class="empty-state">
                                 <div style="text-align: center; padding: 3rem; color: #6c757d;">
@@ -291,6 +323,7 @@
             </div>
         </div>
     </div>
-<script src="./scripts/apply.js"></script>
+    <script src="scripts/language.js"></script>
+    <script src="scripts/apply.js"></script>
 </body>
 </html>

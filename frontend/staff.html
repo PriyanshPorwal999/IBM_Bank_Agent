@@ -8,11 +8,43 @@
 </head>
 <body>
     <div class="header">
-        <h1>👩‍💼 Staff Portal</h1>
-        <p class="subtitle">Secure Staff Access to Banking Administration</p>
-        <div class="nav-links">
-            <a href="index.html" class="nav-link">🤖 Loan Agent</a>
-            <a href="apply.html" class="nav-link">💼 Apply for Loan</a>
+        <div class="header-content">
+            <div class="header-main">
+                <h1 data-translate="staff-title">👩‍💼 Staff Portal</h1>
+                <p class="subtitle" data-translate="staff-subtitle">Secure Staff Access to Banking Administration</p>
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link" data-translate="nav-agent">🤖 Loan Agent</a>
+                    <a href="apply.html" class="nav-link" data-translate="nav-apply">💼 Apply for Loan</a>
+                </div>
+            </div>
+            
+            <div class="language-selector">
+                <div class="language-dropdown">
+                    <button class="language-btn" id="languageBtn">
+                        <span class="language-flag" id="currentFlag">🇺🇸</span>
+                        <span class="language-text" id="currentLang">English</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="language-menu" id="languageMenu">
+                        <div class="language-option" onclick="changeLanguage('en')">
+                            <span class="flag">🇺🇸</span>
+                            <span>English</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('hi')">
+                            <span class="flag">🇮🇳</span>
+                            <span>हिंदी</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('ta')">
+                            <span class="flag">🇮🇳</span>
+                            <span>தமிழ்</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('te')">
+                            <span class="flag">🇮🇳</span>
+                            <span>తెలుగు</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -25,8 +57,8 @@
         <div class="login-container">
             <div class="login-header">
                 <div class="login-icon">🔐</div>
-                <h2>Staff Login</h2>
-                <p>Access the administrative dashboard</p>
+                <h2 data-translate="staff-login">Staff Login</h2>
+                <p data-translate="staff-subtitle">Access the administrative dashboard</p>
             </div>
             
             <div class="alert alert-error" id="errorAlert"></div>
@@ -34,18 +66,18 @@
             
             <form id="staffLoginForm">
                 <div class="form-group">
-                    <label for="username">Username</label>
+                    <label for="username" data-translate="username">Username</label>
                     <input type="text" id="username" name="username" required 
-                           placeholder="Enter your staff username">
+                           data-translate-placeholder="username-placeholder" placeholder="Enter your staff username">
                 </div>
                 
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label for="password" data-translate="password">Password</label>
                     <input type="password" id="password" name="password" required 
-                           placeholder="Enter your password">
+                           data-translate-placeholder="password-placeholder" placeholder="Enter your password">
                 </div>
                 
-                <button type="submit" class="login-btn" id="loginBtn">
+                <button type="submit" class="login-btn" id="loginBtn" data-translate="login-btn">
                     Sign In to Dashboard
                 </button>
             </form>
@@ -75,6 +107,7 @@
             </div>
         </div>
     </div>
-<script src="./scripts/staff.js"></script>
+    <script src="scripts/language.js"></script>
+    <script src="scripts/staff.js"></script>
 </body>
 </html>

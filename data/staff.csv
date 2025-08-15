@@ -1,0 +1,2 @@
+id,username,password_hash,email,role,created_at
+afe46f86-f6ba-427e-8900-7a41f7c3b121,admin,scrypt:32768:8:1$IuOqojaHuCARWZdJ$2bf4731bec26008b8b8eec345f3ef217c874b43453e74a254923c1f5f005ed00eda8aa0a46af2963bc7de97d7018272a7bf052cf657c77f61072aca370603cb7,singhishant37@gmail.com,admin,2025-08-08T09:23:22.112073

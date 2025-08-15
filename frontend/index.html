@@ -4,26 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LoanAgent - AI Banking Assistant</title>
-   <link rel="stylesheet" href="./stylesheets/index.css">
+    <link rel="stylesheet" href="./stylesheets/index.css">
 </head>
 <body>
     <div class="header">
-        <h1>🤖 LoanAgent</h1>
-        <p class="subtitle">Your AI-Powered Banking Assistant</p>
-        <div class="nav-links">
-            <a href="apply.html" class="nav-link">💼 Apply for Loan</a>
-            <a href="staff.html" class="nav-link">👩‍💼 Staff Login</a>
+        <div class="header-content">
+            <div class="header-main">
+                <h1 data-translate="app-title">🤖 LoanAgent</h1>
+                <p class="subtitle" data-translate="app-subtitle">Your AI-Powered Banking Assistant</p>
+                <div class="nav-links">
+                    <a href="apply.html" class="nav-link" data-translate="nav-apply">💼 Apply for Loan</a>
+                    <a href="staff.html" class="nav-link" data-translate="nav-staff">👩‍💼 Staff Login</a>
+                </div>
+            </div>
+            
+            <div class="language-selector">
+                <div class="language-dropdown">
+                    <button class="language-btn" id="languageBtn">
+                        <span class="language-flag" id="currentFlag">🇺🇸</span>
+                        <span class="language-text" id="currentLang">English</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="language-menu" id="languageMenu">
+                        <div class="language-option" onclick="changeLanguage('en')">
+                            <span class="flag">🇺🇸</span>
+                            <span>English</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('hi')">
+                            <span class="flag">🇮🇳</span>
+                            <span>हिंदी</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('ta')">
+                            <span class="flag">🇮🇳</span>
+                            <span>தமிழ்</span>
+                        </div>
+                        <div class="language-option" onclick="changeLanguage('te')">
+                            <span class="flag">🇮🇳</span>
+                            <span>తెలుగు</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
     <div class="chat-container">
         <div class="chat-header">
-            <h2>💬 Chat with LoanAgent</h2>
-            <p class="chat-status">Online • Ready to help with your banking needs</p>
+            <h2 data-translate="chat-title">💬 Chat with LoanAgent</h2>
+            <p class="chat-status" data-translate="chat-status">Online • Ready to help with your banking needs</p>
         </div>
         
         <div class="chat-messages" id="chatMessages">
-            <div class="message bot-message">
+            <div class="message bot-message" data-translate="welcome-message">
                 Hello! I'm LoanAgent, your AI banking assistant. I can help you with:
                 <br><br>
                 • Loan information and eligibility
@@ -36,15 +68,15 @@
         </div>
         
         <div class="quick-actions">
-            <div class="quick-action" onclick="sendQuickMessage('What loan types do you offer?')">Loan Types</div>
-            <div class="quick-action" onclick="sendQuickMessage('How to check my eligibility?')">Eligibility Check</div>
-            <div class="quick-action" onclick="sendQuickMessage('What documents are needed?')">Required Documents</div>
-            <div class="quick-action" onclick="sendQuickMessage('How long is the approval process?')">Approval Time</div>
+            <div class="quick-action" onclick="sendQuickMessage('What loan types do you offer?')" data-translate="quick-loan-types">Loan Types</div>
+            <div class="quick-action" onclick="sendQuickMessage('How to check my eligibility?')" data-translate="quick-eligibility">Eligibility Check</div>
+            <div class="quick-action" onclick="sendQuickMessage('What documents are needed?')" data-translate="quick-documents">Required Documents</div>
+            <div class="quick-action" onclick="sendQuickMessage('How long is the approval process?')" data-translate="quick-approval">Approval Time</div>
         </div>
         
         <div class="chat-input">
-            <input type="text" id="messageInput" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" onclick="sendMessage()" id="sendBtn">Send</button>
+            <input type="text" id="messageInput" data-translate-placeholder="chat-placeholder" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" onclick="sendMessage()" id="sendBtn" data-translate="send-btn">Send</button>
         </div>
         
         <div class="typing-indicator" id="typingIndicator">
@@ -56,6 +88,7 @@
         </div>
     </div>
 
-    <script src="./scripts/index.js"></script>
+    <script src="scripts/language.js"></script>
+    <script src="scripts/index.js"></script>
 </body>
 </html>
