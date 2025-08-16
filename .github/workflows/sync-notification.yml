@@ -1,0 +1,25 @@
+name: Simple Sync to Upstream RD
+
+on:
+  push:
+    branches: [ better ]
+
+jobs:
+  notify-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Create sync notification
+      run: |
+        echo "Changes pushed to better branch"
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo ""
+        echo "Manual sync required to upstream RD branch:"
+        echo "git fetch upstream"
+        echo "git checkout better"
+        echo "git push upstream better:RD"

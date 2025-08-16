@@ -1,0 +1,46 @@
+name: Sync Better Branch to Upstream RD
+
+on:
+  push:
+    branches: [ better ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync-to-upstream:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+    
+    - name: Add upstream remote
+      run: |
+        git remote add upstream https://github.com/PriyanshPorwal999/IBM_Bank_Agent.git || true
+        git fetch upstream
+    
+    - name: Create and push to upstream RD branch
+      env:
+        UPSTREAM_TOKEN: ${{ secrets.UPSTREAM_ACCESS_TOKEN }}
+      run: |
+        # Switch to better branch
+        git checkout better
+        
+        # Create or update RD branch with better branch content
+        git checkout -b RD || git checkout RD
+        git reset --hard better
+        
+        # Push to upstream RD branch using personal access token
+        git remote set-url upstream https://$UPSTREAM_TOKEN@github.com/PriyanshPorwal999/IBM_Bank_Agent.git
+        git push upstream RD --force-with-lease
+    
+    - name: Clean up
+      run: |
+        git remote remove upstream || true
